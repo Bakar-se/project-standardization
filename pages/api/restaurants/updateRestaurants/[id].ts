@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import type { NextApiRequest, NextApiResponse } from "next";
 
@@ -15,6 +15,7 @@ export default async function handler(
     try {
       const { name } = req.body;
 
+      // Ensure the restaurant exists
       const existingRestaurant = await prisma.restaurant.findUnique({
         where: { id: Number(id) },
       });
@@ -22,9 +23,10 @@ export default async function handler(
       if (!existingRestaurant) {
         return res
           .status(StatusCodes.NOT_FOUND)
-          .json({ error: "Restaurant not found" });
+          .json({ error: "Restaurant not found." });
       }
 
+      // Update the restaurant name (or keep the old name if not provided)
       const updatedRestaurant = await prisma.restaurant.update({
         where: { id: Number(id) },
         data: {
@@ -32,12 +34,43 @@ export default async function handler(
         },
       });
 
-      return res.status(StatusCodes.OK).json(updatedRestaurant);
+      return res.status(StatusCodes.OK).json({
+        message: "Restaurant updated successfully.",
+        updatedRestaurant,
+      });
     } catch (error) {
-      console.error("Error updating restaurant: ", error);
-      return res
-        .status(StatusCodes.INTERNAL_SERVER_ERROR)
-        .json({ error: "Error updating restaurant" });
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        console.error("Prisma known error: ", error);
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          error: "A known database error occurred.",
+          details: error.message,
+        });
+      } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+        console.error("Prisma unknown error: ", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+          error: "An unknown database error occurred.",
+        });
+      } else if (error instanceof Prisma.PrismaClientRustPanicError) {
+        console.error("Prisma Rust panic: ", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+          error: "A critical error occurred in the database engine.",
+        });
+      } else if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error("Prisma initialization error: ", error);
+        return res.status(StatusCodes.SERVICE_UNAVAILABLE).json({
+          error: "Database service is unavailable.",
+        });
+      } else if (error instanceof Prisma.PrismaClientValidationError) {
+        console.error("Prisma validation error: ", error);
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          error: "Invalid data format or input.",
+        });
+      } else {
+        console.error("Unknown error: ", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+          error: "An unknown error occurred.",
+        });
+      }
     }
   } else {
     res.setHeader("Allow", ["PUT"]);

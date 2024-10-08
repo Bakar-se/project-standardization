@@ -4,10 +4,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 const prisma = new PrismaClient();
 
-export default async function handler(
+const handler = async (
   req: NextApiRequest,
   res: NextApiResponse
-) {
+) => {
   if (req.method === "GET") {
     try {
       const restaurants = await prisma.restaurant.findMany({
@@ -49,3 +49,5 @@ export default async function handler(
     return res.status(StatusCodes.METHOD_NOT_ALLOWED).end(`Method ${req.method} Not Allowed`);
   }
 }
+
+export default handler; // Export as default
