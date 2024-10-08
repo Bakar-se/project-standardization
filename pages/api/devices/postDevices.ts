@@ -8,18 +8,43 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method === "GET") {
+  if (req.method === "POST") {
+    const { device_name, device_id, device_type, restaurant_id, status } = req.body;
+
+    if (!device_name || !device_id || !device_type || !restaurant_id) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ error: "All fields are required: device_name, device_id, device_type, and restaurant_id." });
+    }
+
     try {
-      const devices = await prisma.device.findMany({
-        include: {
-          restaurant: true,
-        },
-        orderBy: {
-          id: 'desc',
+      const restaurant = await prisma.restaurant.findUnique({
+        where: {
+          id: restaurant_id,
         },
       });
 
-      return res.status(StatusCodes.OK).json(devices);
+      if (!restaurant) {
+        return res.status(StatusCodes.NOT_FOUND).json({ error: "Restaurant not found." });
+      }
+
+      const device = await prisma.device.create({
+        data: {
+          device_name,
+          device_id,
+          device_type,
+          status: status || "ACTIVE",
+          restaurant: {
+            connect: {
+              id: restaurant_id,
+            },
+          },
+        },
+      });
+
+      return res.status(StatusCodes.CREATED).json({
+        message: "Device created successfully.",
+        device,
+      });
+      
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         console.error("Prisma known error: ", error);
@@ -42,7 +67,7 @@ export default async function handler(
       }
     }
   } else {
-    res.setHeader("Allow", ["GET"]);
+    res.setHeader("Allow", ["POST"]);
     return res.status(StatusCodes.METHOD_NOT_ALLOWED).end(`Method ${req.method} Not Allowed`);
   }
 }

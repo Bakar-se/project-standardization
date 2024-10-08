@@ -8,18 +8,28 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method === "GET") {
+  const { id } = req.query;
+
+  if (req.method === "DELETE") {
     try {
-      const devices = await prisma.device.findMany({
-        include: {
-          restaurant: true,
-        },
-        orderBy: {
-          id: 'desc',
+      const existingDevice = await prisma.device.findUnique({
+        where: {
+          id: Number(id),
         },
       });
 
-      return res.status(StatusCodes.OK).json(devices);
+      if (!existingDevice) {
+        return res.status(StatusCodes.NOT_FOUND).json({ error: "Device not found." });
+      }
+
+      await prisma.device.delete({
+        where: {
+          id: Number(id),
+        },
+      });
+
+      return res.status(StatusCodes.OK).json({ message: "Device deleted successfully." }); // Return a success message
+
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         console.error("Prisma known error: ", error);
@@ -42,7 +52,7 @@ export default async function handler(
       }
     }
   } else {
-    res.setHeader("Allow", ["GET"]);
+    res.setHeader("Allow", ["PUT", "DELETE"]);
     return res.status(StatusCodes.METHOD_NOT_ALLOWED).end(`Method ${req.method} Not Allowed`);
   }
 }

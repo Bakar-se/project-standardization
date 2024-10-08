@@ -15,7 +15,6 @@ export default async function handler(
     try {
       const { name } = req.body;
 
-      // Ensure the restaurant exists
       const existingRestaurant = await prisma.restaurant.findUnique({
         where: { id: Number(id) },
       });
@@ -26,7 +25,6 @@ export default async function handler(
           .json({ error: "Restaurant not found." });
       }
 
-      // Update the restaurant name (or keep the old name if not provided)
       const updatedRestaurant = await prisma.restaurant.update({
         where: { id: Number(id) },
         data: {

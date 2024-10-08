@@ -8,18 +8,22 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const { id } = req.query;
+
   if (req.method === "GET") {
     try {
-      const devices = await prisma.device.findMany({
-        include: {
-          restaurant: true,
-        },
-        orderBy: {
-          id: 'desc',
+      const device = await prisma.device.findUnique({
+        where: {
+          id: Number(id),
         },
       });
 
-      return res.status(StatusCodes.OK).json(devices);
+      if (!device) {
+        return res.status(StatusCodes.NOT_FOUND).json({ error: "Device not found." });
+      }
+
+      return res.status(StatusCodes.OK).json(device);
+
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         console.error("Prisma known error: ", error);
@@ -42,7 +46,7 @@ export default async function handler(
       }
     }
   } else {
-    res.setHeader("Allow", ["GET"]);
+    res.setHeader("Allow", ["GET", "PUT", "DELETE"]);
     return res.status(StatusCodes.METHOD_NOT_ALLOWED).end(`Method ${req.method} Not Allowed`);
   }
 }
