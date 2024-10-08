@@ -1,3 +1,4 @@
+import { handlePrismaError } from "@/lib/errorHandler";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { StatusCodes } from "http-status-codes";
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -6,20 +7,20 @@ const prisma = new PrismaClient();
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse<DeviceCreateResponse | { error: string }>
 ) {
   if (req.method === "POST") {
-    const { device_name, device_id, device_type, restaurant_id, status } = req.body;
+    const { device_name, device_id, device_type, restaurant_id, status }: DeviceCreateRequestBody = req.body;
 
     if (!device_name || !device_id || !device_type || !restaurant_id) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ error: "All fields are required: device_name, device_id, device_type, and restaurant_id." });
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        error: "All fields are required: device_name, device_id, device_type, and restaurant_id."
+      });
     }
 
     try {
       const restaurant = await prisma.restaurant.findUnique({
-        where: {
-          id: restaurant_id,
-        },
+        where: { id: restaurant_id },
       });
 
       if (!restaurant) {
@@ -33,37 +34,31 @@ export default async function handler(
           device_type,
           status: status || "ACTIVE",
           restaurant: {
-            connect: {
-              id: restaurant_id,
-            },
+            connect: { id: restaurant_id },
           },
         },
       });
 
       return res.status(StatusCodes.CREATED).json({
         message: "Device created successfully.",
-        device,
+        device: {
+          id: device.id,
+          device_name: device.device_name,
+          device_id: device.device_id,
+          device_type: device.device_type,
+          status: device.status,
+          restaurant_id: device.restaurant_id,
+          created_at: device.created_at,
+          updated_at: device.updated_at,
+        },
       });
-      
+
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        console.error("Prisma known error: ", error);
-        return res.status(StatusCodes.BAD_REQUEST).json({ error: "A known database error occurred.", details: error.message });
-      } else if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-        console.error("Prisma unknown error: ", error);
-        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "An unknown database error occurred." });
-      } else if (error instanceof Prisma.PrismaClientRustPanicError) {
-        console.error("Prisma Rust panic: ", error);
-        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "A critical error occurred in the database engine." });
-      } else if (error instanceof Prisma.PrismaClientInitializationError) {
-        console.error("Prisma initialization error: ", error);
-        return res.status(StatusCodes.SERVICE_UNAVAILABLE).json({ error: "Database service is unavailable." });
-      } else if (error instanceof Prisma.PrismaClientValidationError) {
-        console.error("Prisma validation error: ", error);
-        return res.status(StatusCodes.BAD_REQUEST).json({ error: "Invalid data format or input." });
+        const { statusCode, message } = handlePrismaError(error);
+        return res.status(statusCode).json({ error: message });
       } else {
-        console.error("Unknown error: ", error);
-        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "An unknown error occurred." });
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "An unexpected error occurred." });
       }
     }
   } else {
